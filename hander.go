@@ -3,35 +3,32 @@ package wechat
 import (
 	"duhangsoft/wechat/message"
 	"net/http"
-	"net/url"
 )
 
 //接受微信消息
 func (client *WeChatClient) messageHandler(w http.ResponseWriter, r *http.Request) {
-	queryForm, err := url.ParseQuery(r.URL.RawQuery)
-	if err != nil {
-		log.Errorln("get signature failed")
-		return
-	}
-	signature := queryForm["signature"][0]
-	timestamp := queryForm["timestamp"][0]
-	nonce := queryForm["nonce"][0]
-	echostr := queryForm["echostr"]
-	if !client.checkSignature(signature, timestamp, nonce) {
-		log.Errorln("->s: " + signature + "->t: " + timestamp + "->n:" + nonce)
-		return
-	}
-	if len(echostr) > 0 {
-		w.Write([]byte(echostr[0]))
-		return
-	}
-	var msg message.TextMessage
 
+	echostr, ok := client.checkSignature(r)
+	if !ok {
+		log.Errorln("check mesage From error!", r.Host)
+		return
+	}
+	if echostr != "" {
+		w.Write([]byte(echostr))
+		return
+	}
+	var msg message.RMessage
+
+	//得到消息
 	msg.ReceiveMessage(r)
 	log.Debugln(msg)
-	msg.FromUser, msg.ToUser = msg.ToUser, msg.FromUser
-	log.Debugln("send msg", string(msg.Send()))
-	w.Write(msg.Send())
+
+	//对消息进行处理得到要回复的消息
+	replyMsg := msg.GetReplyMsg()
+	//对要回复的消息做点啥－比如记录
+
+	//回复消息
+	w.Write(message.Send(replyMsg))
 	return
 }
 
